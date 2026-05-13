@@ -3,23 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPS記録マップ</title>
-    
-    <!-- 地図ライブラリ Leaflet の読み込み（正しいURL） -->
-    <link rel="stylesheet" href="cloudflare.com"/1.9.4/leaflet.css />
-    <script src="cloudflare.com"/1.9.4/leaflet.js/></script>
-</head>
-
-
+    <title>GPS記録マップ（最新版）</title>
     <style>
         body { font-family: sans-serif; margin: 0; padding: 20px; text-align: center; background: #f9f9f9; }
         h2 { color: #333; margin-bottom: 10px; }
-        #map { height: 300px; width: 100%; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        /* 簡易的な地図代わりの表示エリア */
+        #map-box { height: 180px; width: 100%; border-radius: 10px; margin-bottom: 15px; background: #e0f2f1; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; color: #00796b; border: 2px dashed #009688; box-sizing: border-box; }
         input { width: 90%; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box; }
         .btn-container { display: flex; justify-content: center; gap: 10px; margin-bottom: 15px; }
         button { flex: 1; padding: 15px; font-size: 18px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; color: white; max-width: 150px; }
-        .btn-yes { background: #4CAF50; } /* 緑 */
-        .btn-no { background: #f44336; }  /* 赤 */
+        .btn-yes { background: #4CAF50; }
+        .btn-no { background: #f44336; }
         #status { font-size: 14px; color: #666; margin-top: 10px; min-height: 1.5em; }
     </style>
 </head>
@@ -27,8 +21,8 @@
 
     <h2>GPS活動記録</h2>
 
-    <!-- 地図を表示するエリア -->
-    <div id="map">地図を読み込み中...</div>
+    <!-- エラーの起きないシンプルな位置確認エリア -->
+    <div id="map-box">現在地を読み込み中...</div>
 
     <!-- 入力エリア -->
     <input type="text" id="comment" placeholder="コメントを入力（任意）">
@@ -38,42 +32,33 @@
         <button class="btn-no" onclick="sendData('会えない')">会えない</button>
     </div>
 
-    <p id="status">ボタンを押すと現在地を取得します</p>
+    <p id="status">ボタンを押すと現在地を取得してスプレッドシートへ送ります</p>
 
     <script>
-        let map;
-        let marker;
-
-        // 地図の初期化（最初は東京付近を表示）
-        function initMap(lat, lng) {
-            if (!map) {
-                map = L.map('map').setView([lat, lng], 16);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; OpenStreetMap'
-                }).addTo(map);
-                marker = L.marker([lat, lng]).addTo(map);
-            } else {
-                map.setView([lat, lng]);
-                marker.setLatLng([lat, lng]);
-            }
-        }
-
-        // ページ読み込み時に一度位置を取得して地図を表示
+        // ページを開いたときに自動でGPSを取得する
         window.onload = () => {
+            if (!navigator.geolocation) {
+                document.getElementById('map-box').innerText = "お使いのスマホはGPS非対応です";
+                return;
+            }
             navigator.geolocation.getCurrentPosition((pos) => {
-                initMap(pos.coords.latitude, pos.coords.longitude);
+                const lat = pos.coords.latitude.toFixed(4);
+                const lng = pos.coords.longitude.toFixed(4);
+                document.getElementById('map-box').innerHTML = "📍 現在地を確認しました<br>（緯度: " + lat + " / 経度: " + lng + "）";
             }, () => {
-                document.getElementById('map').innerText = "GPSを許可してください";
+                document.getElementById('map-box').innerText = "スマホの設定で位置情報を許可してください";
             });
         };
 
         function sendData(statusResult) {
             const statusLabel = document.getElementById("status");
             const commentValue = document.getElementById("comment").value;
-            const gasUrl = "https://script.google.com/macros/s/AKfycby6GloPaGgA7KPaXMkx6B62ARTIolb12K_VxCbe38SnjPECHlKM8uKi3KuzLPN8JSJ8tQ/exec"; // ←★ここに自分のGASのURLを貼る
+            
+            // ★【重要】ここにあなたのGASのウェブアプリURLを貼り付けてください
+            const gasUrl = "YOUR_WEB_APP_URL"; 
 
             if (gasUrl === "YOUR_WEB_APP_URL") {
-                alert("GASのURLを設定してください！");
+                alert("コード内のYOUR_WEB_APP_URLを、ご自身のGASのURLに書き換えてください！");
                 return;
             }
 
@@ -82,29 +67,27 @@
             navigator.geolocation.getCurrentPosition((position) => {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
-                      
 
-                // 地図を更新
-                initMap(lat, lng);
+                statusLabel.innerText = "スプレッドシートへデータを送信中...";
 
-                statusLabel.innerText = "データを送信中...";
-
-                // GASへ送信
-                const finalUrl = `${gasUrl}?lat=${lat}&lng=${lng}&status=${encodeURIComponent(statusResult)}&comment=${encodeURIComponent(commentValue)}`;
+                // 送信用のURLを組み立て
+                const finalUrl = gasUrl + "?lat=" + lat + "&lng=" + lng + "&status=" + encodeURIComponent(statusResult) + "&comment=" + encodeURIComponent(commentValue);
                 
+                // 送信処理
                 fetch(finalUrl, { mode: 'no-cors' })
                     .then(() => {
-                        statusLabel.innerText = "✅ 保存完了！ (" + statusResult + ")";
-                        document.getElementById("comment").value = ""; // 入力欄をクリア
+                        statusLabel.innerText = "✅ スプレッドシートに保存しました！ (" + statusResult + ")";
+                        document.getElementById("comment").value = ""; 
                     })
                     .catch(() => {
-                        statusLabel.innerText = "❌ 送信に失敗しました";
+                        statusLabel.innerText = "❌ 送信に失敗しました。ネット環境を確認してください";
                     });
 
             }, (error) => {
-                statusLabel.innerText = "エラー: GPSが取得できませんでした";
+                statusLabel.innerText = "❌ エラー: GPSが取得できませんでした";
             });
         }
     </script>
 </body>
 </html>
+
