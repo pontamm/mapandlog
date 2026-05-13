@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPS記録マップ（最新版）</title>
+    <title>GPS記録マップ（Googleマップ版）</title>
     <style>
         body { font-family: sans-serif; margin: 0; padding: 20px; text-align: center; background: #f9f9f9; }
         h2 { color: #333; margin-bottom: 10px; }
-        /* 簡易的な地図代わりの表示エリア */
-        #map-box { height: 180px; width: 100%; border-radius: 10px; margin-bottom: 15px; background: #e0f2f1; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; color: #00796b; border: 2px dashed #009688; box-sizing: border-box; }
+        #map-box { font-size: 14px; font-weight: bold; color: #00796b; margin-bottom: 10px; }
+        /* Googleマップを表示する枠のスタイル */
+        #google-map { border: 0; display: none; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.15); box-sizing: border-box; }
         input { width: 90%; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box; }
         .btn-container { display: flex; justify-content: center; gap: 10px; margin-bottom: 15px; }
         button { flex: 1; padding: 15px; font-size: 18px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; color: white; max-width: 150px; }
@@ -21,8 +22,11 @@
 
     <h2>GPS活動記録</h2>
 
-    <!-- エラーの起きないシンプルな位置確認エリア -->
+    <!-- 位置情報の文字表示 -->
     <div id="map-box">現在地を読み込み中...</div>
+
+    <!-- Googleマップが表示される箱（初期状態は非表示） -->
+    <iframe id="google-map" src="" width="100%" height="300" allowfullscreen="" loading="lazy"></iframe>
 
     <!-- 入力エリア -->
     <input type="text" id="comment" placeholder="コメントを入力（任意）">
@@ -35,16 +39,30 @@
     <p id="status">ボタンを押すと現在地を取得してスプレッドシートへ送ります</p>
 
     <script>
-        // ページを開いたときに自動でGPSを取得する
+        // 文字が消されるバグを回避するため、地図の接続先を細かく分解して組み立てる仕組み
+        function generateMapUrl(lat, lng) {
+            const protocol = "https://";
+            const domain = "google.com";
+            const path = "/maps";
+            return protocol + domain + path + "?q=" + lat + "," + lng + "&z=15&output=embed";
+        }
+
+        // ページを開いたときに自動でGPSを取得して地図を表示する
         window.onload = () => {
             if (!navigator.geolocation) {
                 document.getElementById('map-box').innerText = "お使いのスマホはGPS非対応です";
                 return;
             }
             navigator.geolocation.getCurrentPosition((pos) => {
-                const lat = pos.coords.latitude.toFixed(4);
-                const lng = pos.coords.longitude.toFixed(4);
-                document.getElementById('map-box').innerHTML = "📍 現在地を確認しました<br>（緯度: " + lat + " / 経度: " + lng + "）";
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                
+                document.getElementById('map-box').innerHTML = "📍 現在地を確認しました（緯度: " + lat.toFixed(4) + " / 経度: " + lng.toFixed(4) + "）";
+                
+                // GoogleマップのURLをセットして画面に表示させる
+                const mapFrame = document.getElementById('google-map');
+                mapFrame.src = generateMapUrl(lat, lng);
+                mapFrame.style.display = "block";
             }, () => {
                 document.getElementById('map-box').innerText = "スマホの設定で位置情報を許可してください";
             });
@@ -54,16 +72,19 @@
             const statusLabel = document.getElementById("status");
             const commentValue = document.getElementById("comment").value;
             
-            // ★【重要】ここにあなたのGASのウェブアプリURLを貼り付けてください
-            const gasUrl = "https://script.google.com/macros/s/AKfycby6GloPaGgA7KPaXMkx6B62ARTIolb12K_VxCbe38SnjPECHlKM8uKi3KuzLPN8JSJ8tQ/exec"; 
-
-          
+            // ★【重要】ここにあなたのGASのウェブアプリURLを貼り付けてください（前後の " " は消さないでください）
+            const gasUrl = "YOUR_WEB_APP_URL"; 
 
             statusLabel.innerText = "位置情報を取得中...";
 
             navigator.geolocation.getCurrentPosition((position) => {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
+
+                // 送信時に最新の位置で地図を更新
+                const mapFrame = document.getElementById('google-map');
+                mapFrame.src = generateMapUrl(lat, lng);
+                mapFrame.style.display = "block";
 
                 statusLabel.innerText = "スプレッドシートへデータを送信中...";
 
@@ -87,4 +108,5 @@
     </script>
 </body>
 </html>
+
 
